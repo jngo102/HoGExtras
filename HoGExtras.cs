@@ -1,4 +1,4 @@
-﻿using HutongGames.PlayMaker;
+using HutongGames.PlayMaker;
 using HutongGames.PlayMaker.Actions;
 using Modding;
 using System;
@@ -7,6 +7,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Vasi;
+using Language;
+
 using UObject = UnityEngine.Object;
 using USceneMgr = UnityEngine.SceneManagement.SceneManager;
 
@@ -49,20 +51,29 @@ namespace HoGExtras
             USceneMgr.activeSceneChanged += OnSceneChange;
         }
 
+		private static readonly Dictionary<LanguageCode, Dictionary<string, string>> localizations = new() {
+			{ LanguageCode.EN, new () {
+				{ "NAME_THK", "The Hollow Knight"},
+				{ "GG_S_THK", "Corrupted god of nothingness" },
+				{ "NAME_RAD", "The Radiance" },
+				{ "GG_S_RAD", "Forgotten god of light" }
+			}},
+			{ LanguageCode.ZH, new () {
+				{ "NAME_THK", "空洞骑士"},
+				{ "GG_S_THK", "腐坏的虚无之神" },
+				{ "NAME_RAD", "辐光" },
+				{ "GG_S_RAD", "被遗忘的光芒神" }
+			}}
+		};
+
         private string OnLangGet(string key, string sheetTitle, string orig)
         {
-            switch (key)
-            {
-                case "NAME_THK":
-                    return "The Hollow Knight";
-                case "GG_S_THK":
-                    return "Corrupted god of nothingness";
-                case "NAME_RAD":
-                    return "The Radiance";
-                case "GG_S_RAD":
-                    return "Forgotten god of light";
-                default:
-                    return Language.Language.GetInternal(key, sheetTitle);
+			if (sheetTitle != nameof(HoGExtras)) return orig;
+
+			try {
+				return localizations[Language.Language.CurrentLanguage()][key];
+			} catch (KeyNotFoundException) {
+				return localizations[LanguageCode.EN][key];
             }
         }
 
@@ -100,10 +111,10 @@ namespace HoGExtras
             switch (nextScene.name)
             {
                 case "GG_Workshop":
-                    SetStatue("HollowKnight", "NAME_THK", "GG_S_THK", "statueStateTHK", "statueStateHollowKnight", 2);
-                    SetStatue("Radiance", "NAME_RAD", "GG_S_RAD", "statueStateRad", "statueStateRadiance", 0);
+					SetStatue("HollowKnight", "NAME_THK", "GG_S_THK", "statueStateTHK", "statueStateHollowKnight", 2);
+					SetStatue("Radiance", "NAME_RAD", "GG_S_RAD", "statueStateRad", "statueStateRadiance", 0);
+					break;
 
-                    break;
                 case "GG_Hollow_Knight":
                     if (_localSettings.StatueStateHollowKnight.usingAltVersion) break;
 
@@ -243,9 +254,12 @@ namespace HoGExtras
                 bossStatue.altPlaqueL.gameObject.SetActive(true);
                 bossStatue.altPlaqueR.gameObject.SetActive(true);
                 bossStatue.regularPlaque.gameObject.SetActive(false);
-                BossStatue.BossUIDetails details = new();
-                details.nameKey = details.nameSheet = bossName;
-                details.descriptionKey = details.descriptionSheet = bossDesc;
+				BossStatue.BossUIDetails details = new() {
+					nameSheet = nameof(HoGExtras),
+					nameKey = bossName,
+					descriptionSheet = nameof(HoGExtras),
+					descriptionKey = bossDesc
+				};
                 bossStatue.dreamBossDetails = bossStatue.bossDetails;
                 bossStatue.bossDetails = details;
                 bossStatue.dreamBossScene = bossStatue.bossScene;
