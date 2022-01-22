@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -29,7 +30,10 @@ namespace HoGExtras
 		private Dictionary<string, GameObject> _preloads = new();
 		public Dictionary<string, GameObject> Preloads => _preloads;
 
-		public override string GetVersion() => "1.0.0.0";
+		public override string GetVersion() => Assembly
+			.GetExecutingAssembly()
+			.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+			.InformationalVersion;
 
 		public override List<ValueTuple<string, string>> GetPreloadNames()
 		{
