@@ -1,269 +1,303 @@
-﻿using HutongGames.PlayMaker;
-using HutongGames.PlayMaker.Actions;
-using Modding;
-using System;
+﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
+
 using UnityEngine;
 using UnityEngine.SceneManagement;
+
+using HutongGames.PlayMaker;
+using HutongGames.PlayMaker.Actions;
+
+using Modding;
+
 using Vasi;
+
+using Language;
+
 using UObject = UnityEngine.Object;
 using USceneMgr = UnityEngine.SceneManagement.SceneManager;
 
 namespace HoGExtras
 {
-    public class HoGExtras : Mod, ILocalSettings<LocalSettings>
-    {
-        private static LocalSettings _localSettings = new LocalSettings();
-        public static LocalSettings LocalSettings = _localSettings;
+	public class HoGExtras : Mod, ILocalSettings<LocalSettings>
+	{
+		private static LocalSettings _localSettings = new LocalSettings();
+		public static LocalSettings LocalSettings = _localSettings;
 
-        internal static HoGExtras Instance;
+		internal static HoGExtras Instance;
 
-        private Dictionary<string, GameObject> _preloads = new();
-        public Dictionary<string, GameObject> Preloads => _preloads;
+		private Dictionary<string, GameObject> _preloads = new();
+		public Dictionary<string, GameObject> Preloads => _preloads;
 
-        public override string GetVersion() => "1.0.0.0";
+		public override string GetVersion() => Assembly
+			.GetExecutingAssembly()
+			.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+			.InformationalVersion;
 
-        public override List<ValueTuple<string, string>> GetPreloadNames()
-        {
-            return new List<ValueTuple<string, string>>
-            {
-                ("Room_Final_Boss_Core", "Boss Control"),
-                ("Dream_Final_Boss", "Boss Control"),
-            };
-        }
+		public override List<ValueTuple<string, string>> GetPreloadNames()
+		{
+			return new List<ValueTuple<string, string>>
+			{
+				("Room_Final_Boss_Core", "Boss Control"),
+				("Dream_Final_Boss", "Boss Control"),
+			};
+		}
 
-        public HoGExtras() : base("Hall of Gods Extras")
-        {
-            Instance = this;
-        }
+		public HoGExtras() : base("Hall of Gods Extras")
+		{
+			Instance = this;
+		}
 
-        public override void Initialize(Dictionary<string, Dictionary<string, GameObject>> preloadedObjects)
-        {
-            _preloads.Add("THK", preloadedObjects["Room_Final_Boss_Core"]["Boss Control"]);
-            _preloads.Add("Rad", preloadedObjects["Dream_Final_Boss"]["Boss Control"]);
+		public override void Initialize(Dictionary<string, Dictionary<string, GameObject>> preloadedObjects)
+		{
+			_preloads.Add("THK", preloadedObjects["Room_Final_Boss_Core"]["Boss Control"]);
+			_preloads.Add("Rad", preloadedObjects["Dream_Final_Boss"]["Boss Control"]);
 
-            ModHooks.LanguageGetHook += OnLangGet;
-            ModHooks.GetPlayerVariableHook += GetVarHook;
-            ModHooks.SetPlayerVariableHook += SetVarHook;
-            USceneMgr.activeSceneChanged += OnSceneChange;
-        }
-
-        private string OnLangGet(string key, string sheetTitle, string orig)
-        {
-            switch (key)
-            {
-                case "NAME_THK":
-                    return "The Hollow Knight";
-                case "GG_S_THK":
-                    return "Corrupted god of nothingness";
-                case "NAME_RAD":
-                    return "The Radiance";
-                case "GG_S_RAD":
-                    return "Forgotten god of light";
-                default:
-                    return Language.Language.GetInternal(key, sheetTitle);
-            }
-        }
+			ModHooks.LanguageGetHook += OnLangGet;
+			ModHooks.GetPlayerVariableHook += GetVarHook;
+			ModHooks.SetPlayerVariableHook += SetVarHook;
+			USceneMgr.activeSceneChanged += OnSceneChange;
+		}
 
 
-        private object SetVarHook(Type t, string key, object obj)
-        {
-            switch (key)
-            {
-                case "statueStateTHK":
-                    _localSettings.StatueStateHollowKnight = (BossStatue.Completion)obj;
-                    break;
-                case "statueStateRad":
-                    _localSettings.StatueStateRadiance = (BossStatue.Completion)obj;
-                    break;
-            }
+		private static readonly Dictionary<LanguageCode, Dictionary<string, string>> localizations = new() {
+			{ LanguageCode.EN, new () {
+				{ "NAME_THK", "The Hollow Knight"},
+				{ "GG_S_THK", "Corrupted god of nothingness" },
+				{ "NAME_RAD", "The Radiance" },
+				{ "GG_S_RAD", "Forgotten god of light" }
+			}},
+			{ LanguageCode.ZH, new () {
+				{ "NAME_THK", "空洞骑士"},
+				{ "GG_S_THK", "腐坏的虚无之神" },
+				{ "NAME_RAD", "辐光" },
+				{ "GG_S_RAD", "被遗忘的光芒神" }
+			}}
+		};
 
-            return obj;
-        }
+		private string OnLangGet(string key, string sheetTitle, string orig)
+		{
+			if (sheetTitle != nameof(HoGExtras)) return orig;
 
-        private object GetVarHook(Type t, string key, object orig)
-        {
-            switch (key)
-            {
-                case "statueStateTHK":
-                    return _localSettings.StatueStateHollowKnight;
-                case "statueStateRad":
-                    return _localSettings.StatueStateRadiance;
-                default:
-                    return orig;
-            }
-        }
+			try {
+				return localizations[Language.Language.CurrentLanguage()][key];
+			} catch (KeyNotFoundException) {
+				return localizations[LanguageCode.EN][key];
+			}
+		}
 
-        private void OnSceneChange(Scene prevScene, Scene nextScene)
-        {
-            switch (nextScene.name)
-            {
-                case "GG_Workshop":
-                    SetStatue("HollowKnight", "NAME_THK", "GG_S_THK", "statueStateTHK", "statueStateHollowKnight", 2);
-                    SetStatue("Radiance", "NAME_RAD", "GG_S_RAD", "statueStateRad", "statueStateRadiance", 0);
 
-                    break;
-                case "GG_Hollow_Knight":
-                    if (_localSettings.StatueStateHollowKnight.usingAltVersion) break;
+		private object SetVarHook(Type t, string key, object obj)
+		{
+			switch (key)
+			{
+				case "statueStateTHK":
+					_localSettings.StatueStateHollowKnight = (BossStatue.Completion)obj;
+					break;
+				case "statueStateRad":
+					_localSettings.StatueStateRadiance = (BossStatue.Completion)obj;
+					break;
+			}
 
-                    var bossCtrl = UObject.Instantiate(Preloads["THK"]);
-                    bossCtrl.transform.Translate(10, 0, 0);
-                    bossCtrl.transform.Find("break_chains").Translate(-10, 0, 0);
-                    bossCtrl.transform.Find("Title").Translate(-10, 0, 0);
-                    bossCtrl.SetActive(true);
+			return obj;
+		}
 
-                    PlayMakerFSM battleStart = bossCtrl.LocateMyFSM("Battle Start");
-                    battleStart.ChangeTransition("Init", "FINISHED", "Revisit");
+		private object GetVarHook(Type t, string key, object orig)
+		{
+			switch (key)
+			{
+				case "statueStateTHK":
+					return _localSettings.StatueStateHollowKnight;
+				case "statueStateRad":
+					return _localSettings.StatueStateRadiance;
+				default:
+					return orig;
+			}
+		}
 
-                    GameObject thk = bossCtrl.transform.Find("Hollow Knight Boss").gameObject;
+		private void OnSceneChange(Scene prevScene, Scene nextScene)
+		{
+			switch (nextScene.name)
+			{
+				case "GG_Workshop":
+					SetStatue("HollowKnight", "NAME_THK", "GG_S_THK", "statueStateTHK", "statueStateHollowKnight", 2);
+					SetStatue("Radiance", "NAME_RAD", "GG_S_RAD", "statueStateRad", "statueStateRadiance", 0);
+					break;
 
-                    PlayMakerFSM control = thk.LocateMyFSM("Control");
-                    PlayMakerFSM phaseCtrl = thk.LocateMyFSM("Phase Control");
+				case "GG_Hollow_Knight":
+					ModifyTHK();
+					break;
 
-                    var bsc = BossSceneController.Instance;
-                    if (bsc.BossLevel >= 1)
-                    {
-                        thk.GetComponent<HealthManager>().hp = 1450;
-                        phaseCtrl.Fsm.GetFsmInt("Phase2 HP").Value = 870;
-                        phaseCtrl.Fsm.GetFsmInt("Phase3 HP").Value = 460;
-                    }
+				case "GG_Radiance":
+					ModifyRad();
+					break;
+			}
+		}
 
-                    control.GetState("Long Roar End").RemoveAction<PlayerDataBoolTest>();
-                    phaseCtrl.GetState("Set Phase 4").RemoveAction<PlayerDataBoolTest>();
-                    GameObject bossCorpse = thk.transform.Find("Boss Corpse").gameObject;
-                    PlayMakerFSM corpse = bossCorpse.LocateMyFSM("Corpse");
-                    corpse.GetState("Burst").RemoveAction<SendEventByName>();
-                    corpse.GetState("Blow").AddMethod(() => bsc.EndBossScene());
-                    corpse.GetState("Set Knight Focus").RemoveAction<SetFsmBool>();
+		private void ModifyTHK() {
+			if (BossSequenceController.IsInSequence) return;
+			if (_localSettings.StatueStateHollowKnight.usingAltVersion) return;
 
-                    control.SetState("Init");
+			var bossCtrl = UObject.Instantiate(Preloads["THK"]);
+			bossCtrl.transform.Translate(10, 0, 0);
+			bossCtrl.transform.Find("break_chains").Translate(-10, 0, 0);
+			bossCtrl.transform.Find("Title").Translate(-10, 0, 0);
+			bossCtrl.SetActive(true);
 
-                    var battleScene = GameObject.Find("Battle Scene");
-                    GameObject godseeker = battleScene.transform.Find("Godseeker Crowd").gameObject;
-                    godseeker.transform.SetParent(null);
-                    FsmGameObject target = godseeker.LocateMyFSM("Control").Fsm.GetFsmGameObject("Target");
-                    target.Value = thk;
-                    battleStart.GetState("Roar Antic").AddMethod(() => target.Value = HeroController.instance.gameObject);
-                    UObject.Destroy(battleScene);
+			PlayMakerFSM battleStart = bossCtrl.LocateMyFSM("Battle Start");
+			battleStart.ChangeTransition("Init", "FINISHED", "Revisit");
 
-                    break;
-                case "GG_Radiance":
-                    if (_localSettings.StatueStateRadiance.usingAltVersion) break;
+			GameObject thk = bossCtrl.transform.Find("Hollow Knight Boss").gameObject;
 
-                    bossCtrl = UObject.Instantiate(Preloads["Rad"]);
-                    bossCtrl.SetActive(true);
+			PlayMakerFSM control = thk.LocateMyFSM("Control");
+			PlayMakerFSM phaseCtrl = thk.LocateMyFSM("Phase Control");
 
-                    Transform rad = bossCtrl.transform.Find("Radiance");
-                    control = rad.gameObject.LocateMyFSM("Control");
-                    FsmState ballTween = control.GetState("Ball Tween");
-                    ballTween.AddCoroutine(RadDeath);
-                    control.CreateState("Dummy");
-                    ballTween.ChangeTransition("FINISHED", "Dummy");
+			var bsc = BossSceneController.Instance;
+			if (bsc.BossLevel >= 1)
+			{
+				thk.GetComponent<HealthManager>().hp = 1450;
+				phaseCtrl.Fsm.GetFsmInt("Phase2 HP").Value = 870;
+				phaseCtrl.Fsm.GetFsmInt("Phase3 HP").Value = 460;
+			}
 
-                    bossCtrl = GameObject.Find("Boss Control");
-                    PlayMakerFSM arCtrl = bossCtrl.transform.Find("Absolute Radiance").gameObject.LocateMyFSM("Control");
-                    _bossExplode = arCtrl.GetState("Knight Break").GetAction<AudioPlayerOneShotSingle>().audioClip.Value as AudioClip;
-                    _finalHitPt3 = arCtrl.GetState("Statue Death 2").GetAction<AudioPlayerOneShotSingle>().audioClip.Value as AudioClip;
-                    _rumble = arCtrl.GetState("Statue Death 1").GetAction<AudioPlayerOneShotSingle>().audioClip.Value as AudioClip;
-                    godseeker = bossCtrl.transform.Find("Godseeker Crowd").gameObject;
-                    godseeker.transform.SetParent(null);
-                    UObject.Destroy(bossCtrl);
+			control.GetState("Long Roar End").RemoveAction<PlayerDataBoolTest>();
+			phaseCtrl.GetState("Set Phase 4").RemoveAction<PlayerDataBoolTest>();
+			GameObject bossCorpse = thk.transform.Find("Boss Corpse").gameObject;
+			PlayMakerFSM corpse = bossCorpse.LocateMyFSM("Corpse");
+			corpse.GetState("Burst").RemoveAction<SendEventByName>();
+			corpse.GetState("Blow").AddMethod(() => bsc.EndBossScene());
+			corpse.GetState("Set Knight Focus").RemoveAction<SetFsmBool>();
 
-                    break;
-            }
-        }
+			control.SetState("Init");
 
-        private AudioClip _bossExplode, _finalHitPt3, _rumble;
-        private IEnumerator RadDeath()
-        {
-            Transform bossCtrl = GameObject.Find("Boss Control(Clone)(Clone)").transform;
-            Transform rad = bossCtrl.Find("Radiance");
+			var battleScene = GameObject.Find("Battle Scene");
+			GameObject godseeker = battleScene.transform.Find("Godseeker Crowd").gameObject;
+			godseeker.transform.SetParent(null);
+			FsmGameObject target = godseeker.LocateMyFSM("Control").Fsm.GetFsmGameObject("Target");
+			target.Value = thk;
+			battleStart.GetState("Roar Antic").AddMethod(() => target.Value = HeroController.instance.gameObject);
+			UObject.Destroy(battleScene);
+		}
 
-            Transform knightSplit = rad.Find("Death/Knight Split");
-            var splitAnim = knightSplit.GetComponent<tk2dSpriteAnimator>();
+		private void ModifyRad() {
+			if (BossSequenceController.IsInSequence) return;
+			if (_localSettings.StatueStateRadiance.usingAltVersion) return;
 
-            yield return new WaitForSeconds(splitAnim.PlayAnimGetTime("Knight Split Antic"));
+			var bossCtrl = UObject.Instantiate(Preloads["Rad"]);
+			bossCtrl.SetActive(true);
 
-            splitAnim.Play("Knight Split");
-            knightSplit.gameObject.GetComponent<PlayMakerFSM>().SendEvent("SPLIT");
+			Transform rad = bossCtrl.transform.Find("Radiance");
+			var control = rad.gameObject.LocateMyFSM("Control");
+			FsmState ballTween = control.GetState("Ball Tween");
+			ballTween.AddCoroutine(RadDeath);
+			control.CreateState("Dummy");
+			ballTween.ChangeTransition("FINISHED", "Dummy");
 
-            Transform knightBall = knightSplit.Find("Knight Ball");
-            knightBall.gameObject.SetActive(true);
-            knightBall.SetParent(null);
-            var ballAnim = knightBall.GetComponent<tk2dSpriteAnimator>();
-            ballAnim.Play("Knight Unform");
+			bossCtrl = GameObject.Find("Boss Control");
+			PlayMakerFSM arCtrl = bossCtrl.transform.Find("Absolute Radiance").gameObject.LocateMyFSM("Control");
+			_bossExplode = arCtrl.GetState("Knight Break").GetAction<AudioPlayerOneShotSingle>().audioClip.Value as AudioClip;
+			_finalHitPt3 = arCtrl.GetState("Statue Death 2").GetAction<AudioPlayerOneShotSingle>().audioClip.Value as AudioClip;
+			_rumble = arCtrl.GetState("Statue Death 1").GetAction<AudioPlayerOneShotSingle>().audioClip.Value as AudioClip;
+			var godseeker = bossCtrl.transform.Find("Godseeker Crowd").gameObject;
+			godseeker.transform.SetParent(null);
+			UObject.Destroy(bossCtrl);
+		}
 
-            Hashtable hashtable = new();
-            hashtable.Add("amount", Vector3.down * 20);
-            hashtable.Add("speed", 10);
-            hashtable.Add("easetype", iTween.EaseType.easeInSine);
-            iTween.MoveBy(ballAnim.gameObject, hashtable);
 
-            GameObject actorPrefab = GameManager.instance.transform.Find("GlobalPool/Audio Player Actor 2D(Clone)").gameObject;
+		private AudioClip _bossExplode, _finalHitPt3, _rumble;
+		private IEnumerator RadDeath()
+		{
+			Transform bossCtrl = GameObject.Find("Boss Control(Clone)(Clone)").transform;
+			Transform rad = bossCtrl.Find("Radiance");
 
-            GameObject audioPlayerActor = actorPrefab.Spawn(HeroController.instance.transform.position);
-            var audioSource = audioPlayerActor.GetComponent<AudioSource>();
-            audioSource.clip = _bossExplode;
-            audioSource.Play();
+			Transform knightSplit = rad.Find("Death/Knight Split");
+			var splitAnim = knightSplit.GetComponent<tk2dSpriteAnimator>();
 
-            yield return new WaitForSeconds(3);
+			yield return new WaitForSeconds(splitAnim.PlayAnimGetTime("Knight Split Antic"));
 
-            var ps = rad.Find("Death Pt").GetComponent<ParticleSystem>();
-            ParticleSystem.MainModule main = ps.main;
-            main.loop = true;
-            ParticleSystem.EmissionModule emission = ps.emission;
-            emission.rateOverTime = 500;
-            ps.Play();
-            
-            GameCameras.instance.cameraShakeFSM.SendEvent("HugeShake");
+			splitAnim.Play("Knight Split");
+			knightSplit.gameObject.GetComponent<PlayMakerFSM>().SendEvent("SPLIT");
 
-            var heroAudio = HeroController.instance.GetComponent<AudioSource>();
-            heroAudio.clip = _rumble;
-            heroAudio.Play();
+			Transform knightBall = knightSplit.Find("Knight Ball");
+			knightBall.gameObject.SetActive(true);
+			knightBall.SetParent(null);
+			var ballAnim = knightBall.GetComponent<tk2dSpriteAnimator>();
+			ballAnim.Play("Knight Unform");
 
-            yield return new WaitForSeconds(3);
+			Hashtable hashtable = new();
+			hashtable.Add("amount", Vector3.down * 20);
+			hashtable.Add("speed", 10);
+			hashtable.Add("easetype", iTween.EaseType.easeInSine);
+			iTween.MoveBy(ballAnim.gameObject, hashtable);
 
-            audioPlayerActor = actorPrefab.Spawn(HeroController.instance.transform.position);
-            audioSource = audioPlayerActor.GetComponent<AudioSource>();
-            audioSource.clip = _finalHitPt3;
-            audioSource.Play();
+			GameObject actorPrefab = GameManager.instance.transform.Find("GlobalPool/Audio Player Actor 2D(Clone)").gameObject;
 
-            BossSceneController.Instance.EndBossScene();
-        }
+			GameObject audioPlayerActor = actorPrefab.Spawn(HeroController.instance.transform.position);
+			var audioSource = audioPlayerActor.GetComponent<AudioSource>();
+			audioSource.clip = _bossExplode;
+			audioSource.Play();
 
-        private void SetStatue(string statueName, string bossName, string bossDesc, string statueStatePD, string dreamStatueStatePD, float switchOffset)
-        {
-            GameManager.instance.StartCoroutine(DoSet());
+			yield return new WaitForSeconds(3);
 
-            IEnumerator DoSet()
-            {
-                var statue = GameObject.Find("GG_Statue_" + statueName);
-                var bossStatue = statue.GetComponent<BossStatue>();
-                bossStatue.altPlaqueL.gameObject.SetActive(true);
-                bossStatue.altPlaqueR.gameObject.SetActive(true);
-                bossStatue.regularPlaque.gameObject.SetActive(false);
-                BossStatue.BossUIDetails details = new();
-                details.nameKey = details.nameSheet = bossName;
-                details.descriptionKey = details.descriptionSheet = bossDesc;
-                bossStatue.dreamBossDetails = bossStatue.bossDetails;
-                bossStatue.bossDetails = details;
-                bossStatue.dreamBossScene = bossStatue.bossScene;
-                bossStatue.statueStatePD = statueStatePD;
-                bossStatue.dreamStatueStatePD = dreamStatueStatePD;
-                var dreamSwitch = statue.transform.Find("dream_version_switch").gameObject;
-                dreamSwitch.transform.Find("lit_pieces/Base Glow").Translate(-switchOffset, 0, 0);
-                dreamSwitch.SetActive(true);
-                dreamSwitch.transform.Translate(switchOffset, 0, 0);
+			var ps = rad.Find("Death Pt").GetComponent<ParticleSystem>();
+			ParticleSystem.MainModule main = ps.main;
+			main.loop = true;
+			ParticleSystem.EmissionModule emission = ps.emission;
+			emission.rateOverTime = 500;
+			ps.Play();
+			
+			GameCameras.instance.cameraShakeFSM.SendEvent("HugeShake");
 
-                yield return new WaitUntil(() => dreamSwitch.transform.Find("GG_statue_plinth_orb_off").GetComponent<BossStatueDreamToggle>() != null);
+			var heroAudio = HeroController.instance.GetComponent<AudioSource>();
+			heroAudio.clip = _rumble;
+			heroAudio.Play();
 
-                var dreamToggle = dreamSwitch.transform.Find("GG_statue_plinth_orb_off").GetComponent<BossStatueDreamToggle>();
-                dreamToggle.SetOwner(bossStatue);
-            }
-        }
+			yield return new WaitForSeconds(3);
 
-        public void OnLoadLocal(LocalSettings localSettings) => _localSettings = localSettings;
-        public LocalSettings OnSaveLocal() => _localSettings;
-    }
+			audioPlayerActor = actorPrefab.Spawn(HeroController.instance.transform.position);
+			audioSource = audioPlayerActor.GetComponent<AudioSource>();
+			audioSource.clip = _finalHitPt3;
+			audioSource.Play();
+
+			BossSceneController.Instance.EndBossScene();
+		}
+
+		private void SetStatue(string statueName, string bossName, string bossDesc, string statueStatePD, string dreamStatueStatePD, float switchOffset)
+		{
+			GameManager.instance.StartCoroutine(DoSet());
+
+			IEnumerator DoSet()
+			{
+				var statue = GameObject.Find("GG_Statue_" + statueName);
+				var bossStatue = statue.GetComponent<BossStatue>();
+				bossStatue.altPlaqueL.gameObject.SetActive(true);
+				bossStatue.altPlaqueR.gameObject.SetActive(true);
+				bossStatue.regularPlaque.gameObject.SetActive(false);
+				BossStatue.BossUIDetails details = new() {
+					nameSheet = nameof(HoGExtras),
+					nameKey = bossName,
+					descriptionSheet = nameof(HoGExtras),
+					descriptionKey = bossDesc
+				};
+				bossStatue.dreamBossDetails = bossStatue.bossDetails;
+				bossStatue.bossDetails = details;
+				bossStatue.dreamBossScene = bossStatue.bossScene;
+				bossStatue.statueStatePD = statueStatePD;
+				bossStatue.dreamStatueStatePD = dreamStatueStatePD;
+				var dreamSwitch = statue.transform.Find("dream_version_switch").gameObject;
+				dreamSwitch.transform.Find("lit_pieces/Base Glow").Translate(-switchOffset, 0, 0);
+				dreamSwitch.SetActive(true);
+				dreamSwitch.transform.Translate(switchOffset, 0, 0);
+
+				yield return new WaitUntil(() => dreamSwitch.transform.Find("GG_statue_plinth_orb_off").GetComponent<BossStatueDreamToggle>() != null);
+
+				var dreamToggle = dreamSwitch.transform.Find("GG_statue_plinth_orb_off").GetComponent<BossStatueDreamToggle>();
+				dreamToggle.SetOwner(bossStatue);
+			}
+		}
+
+		public void OnLoadLocal(LocalSettings localSettings) => _localSettings = localSettings;
+		public LocalSettings OnSaveLocal() => _localSettings;
+	}
 }
